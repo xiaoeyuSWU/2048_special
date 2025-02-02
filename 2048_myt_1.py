@@ -8,23 +8,52 @@ import os
 
 pygame.init()
 
-GRID_GAP = 5
-CORNER_RADIUS = 15
-BORDER_WIDTH = 3
-BORDER_COLOR = (150, 140, 130)
-WIDTH, HEIGHT = 400, 500
-INFO_HEIGHT = 100
+# -------------------------
+# Define a scaling factor
+# -------------------------
+SCALE = 0.7
 
-GAME_HEIGHT = HEIGHT - INFO_HEIGHT
+# --- Global Constants and Layout Settings ---
+
+# Load the merge sound effect.
+merge_sound = pygame.mixer.Sound("xbbb.wav")
+
+# Scaled constants
+GRID_GAP = max(1, int(5 * SCALE))
+CORNER_RADIUS = max(1, int(15 * SCALE))
+BORDER_WIDTH = max(1, int(3 * SCALE))
+BORDER_COLOR = (150, 140, 130)
+
+# New layout constants:
+# We want to use the original image (584 x 500) at the top, but scaled.
+IMAGE_PATH = "xbbb.jpg"
+ORIGINAL_IMAGE_WIDTH = 584
+ORIGINAL_IMAGE_HEIGHT = 500
+IMAGE_WIDTH = int(ORIGINAL_IMAGE_WIDTH * SCALE)
+IMAGE_HEIGHT = int(ORIGINAL_IMAGE_HEIGHT * SCALE)
+
+# Info area (for score, time, moves, etc.) will be just below the image.
+INFO_HEIGHT = int(100 * SCALE)
+
+# The game board (4x4 grid) will be drawn below the info area.
 GRID_SIZE = 4
+# Set the window width equal to the scaled image width.
+WIDTH = IMAGE_WIDTH
+# Compute cell size from WIDTH and GRID_SIZE.
 CELL_SIZE = WIDTH // GRID_SIZE
+BOARD_HEIGHT = CELL_SIZE * GRID_SIZE
+# The top of the board is below the image and info area.
+BOARD_TOP = IMAGE_HEIGHT + INFO_HEIGHT
+# Total window height is the sum of image, info, and board areas.
+HEIGHT = BOARD_TOP + BOARD_HEIGHT
+
 MAX_HISTORY_SIZE = 20
 SAVE_FILE = "savegame.json"
 
-FONT = pygame.font.SysFont("Microsoft YaHei", 24)
+FONT_SIZE = int(24 * SCALE)
+FONT = pygame.font.SysFont("Microsoft YaHei", FONT_SIZE)
 
 BACKGROUND_COLOR = (187, 173, 160)
-
 CELL_COLOR = (204, 192, 179)
 TEXT_COLOR = (119, 110, 101)
 OVERLAY_COLOR = (50, 50, 50, 200)
@@ -62,31 +91,39 @@ CELL_COLORS = {
     "久": (180, 160, 80)
 }
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("2048")
-
-RESTART_BUTTON_WIDTH = 80
-RESTART_BUTTON_HEIGHT = 30
+# Restart button constants (info area).
+RESTART_BUTTON_WIDTH = int(80 * SCALE)
+RESTART_BUTTON_HEIGHT = int(30 * SCALE)
 RESTART_BUTTON_TEXT = "重新开始"
 
 RESTART_BTN_COLOR_NORMAL = (161, 209, 222)
 RESTART_BTN_COLOR_HOVER = (181, 229, 242)
 RESTART_BTN_COLOR_CLICK = (141, 189, 202)
 
+# Set up the display.
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("2048")
+
+# Load the top image and scale it.
+top_image = pygame.image.load(IMAGE_PATH).convert()
+top_image = pygame.transform.scale(top_image, (IMAGE_WIDTH, IMAGE_HEIGHT))
+
+# --- Helper Functions ---
+
 def confirm_action(prompt_text="呜呜宝宝，真的吗? (yes/no)"):
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill(OVERLAY_COLOR)
     screen.blit(overlay, (0, 0))
 
-    dialog_font = pygame.font.SysFont("Microsoft YaHei", 32)
+    dialog_font = pygame.font.SysFont("Microsoft YaHei", int(32 * SCALE))
     text = dialog_font.render(prompt_text, True, (255, 182, 193))
 
-    text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 20))
+    text_rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - int(20 * SCALE)))
     screen.blit(text, text_rect)
 
-    input_font = pygame.font.SysFont("Microsoft YaHei", 28)
+    input_font = pygame.font.SysFont("Microsoft YaHei", int(28 * SCALE))
     input_prompt = input_font.render("输入答案：", True, (255, 255, 255))
-    prompt_rect = input_prompt.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
+    prompt_rect = input_prompt.get_rect(center=(WIDTH // 2, HEIGHT // 2 + int(20 * SCALE)))
     screen.blit(input_prompt, prompt_rect)
 
     pygame.display.update()
@@ -111,7 +148,7 @@ def confirm_action(prompt_text="呜呜宝宝，真的吗? (yes/no)"):
         screen.blit(input_prompt, prompt_rect)
 
         input_text = input_font.render(input_buffer, True, (255, 255, 255))
-        input_rect = input_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 60))
+        input_rect = input_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + int(60 * SCALE)))
         screen.blit(input_text, input_rect)
 
         pygame.draw.line(screen, (255, 255, 255), 
@@ -125,7 +162,7 @@ def show_temp_message(message, duration=1.5):
 
     lines = message.split('\n')
 
-    dialog_font = pygame.font.SysFont("Microsoft YaHei", 24)
+    dialog_font = pygame.font.SysFont("Microsoft YaHei", int(24 * SCALE))
     line_height = dialog_font.get_linesize()
 
     while True:
@@ -192,6 +229,10 @@ def handle_special_input(input_buffer, board):
         return ""
     return input_buffer
 
+def draw_top_image():
+    # Draw the top image at (0,0)
+    screen.blit(top_image, (0, 0))
+
 def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movement_animations, current_time):
     # Determine destination cells that are currently animated (movement in progress)
     animated_destinations = {tuple(anim['to']) for anim in movement_animations if current_time - anim['start_time'] < anim['duration']}
@@ -200,7 +241,7 @@ def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movem
     for row in range(GRID_SIZE):
         for col in range(GRID_SIZE):
             x = col * CELL_SIZE
-            y = INFO_HEIGHT + row * CELL_SIZE
+            y = BOARD_TOP + row * CELL_SIZE  # board starts at BOARD_TOP (IMAGE_HEIGHT + INFO_HEIGHT)
             cell_rect = pygame.Rect(x + GRID_GAP//2, y + GRID_GAP//2, CELL_SIZE - GRID_GAP, CELL_SIZE - GRID_GAP)
             pygame.draw.rect(screen, CELL_COLOR, cell_rect, border_radius=CORNER_RADIUS)
             if board[row][col]:
@@ -242,7 +283,7 @@ def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movem
                 tile_surface = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
                 tile_color = CELL_COLORS.get(NUM_TO_TEXT.get(board[row][col], ""), (126, 170, 196))
                 pygame.draw.rect(tile_surface, tile_color,
-                                (0, 0, scaled_width, scaled_height), border_radius=CORNER_RADIUS + 8)
+                                (0, 0, scaled_width, scaled_height), border_radius=CORNER_RADIUS + int(8 * SCALE))
                 text_str = NUM_TO_TEXT.get(board[row][col], f"{board[row][col]}")
                 text = FONT.render(text_str, True, TEXT_COLOR)
                 text_rect = text.get_rect(center=(scaled_width//2, scaled_height//2))
@@ -265,34 +306,35 @@ def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movem
             current_col = from_col + (to_col - from_col) * progress
             # Compute pixel position for the moving tile
             x = int(current_col * CELL_SIZE)
-            y = int(INFO_HEIGHT + current_row * CELL_SIZE)
+            y = int(BOARD_TOP + current_row * CELL_SIZE)
             scaled_width = CELL_SIZE - GRID_GAP
             scaled_height = CELL_SIZE - GRID_GAP
             rect = pygame.Rect(x + GRID_GAP//2, y + GRID_GAP//2, scaled_width, scaled_height)
             tile_surface = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
             tile_color = CELL_COLORS.get(NUM_TO_TEXT.get(anim['value'], ""), (126, 170, 196))
-            pygame.draw.rect(tile_surface, tile_color, (0, 0, scaled_width, scaled_height), border_radius=CORNER_RADIUS + 8)
+            pygame.draw.rect(tile_surface, tile_color, (0, 0, scaled_width, scaled_height), border_radius=CORNER_RADIUS + int(8 * SCALE))
             text_str = NUM_TO_TEXT.get(anim['value'], f"{anim['value']}")
             text = FONT.render(text_str, True, TEXT_COLOR)
             text_rect = text.get_rect(center=(scaled_width//2, scaled_height//2))
             tile_surface.blit(text, text_rect)
             screen.blit(tile_surface, rect)
     
-    # Draw border rectangle
-    border_rect = pygame.Rect(0, INFO_HEIGHT - 3, WIDTH, GAME_HEIGHT + 5)
+    # Draw border rectangle around the board area
+    border_rect = pygame.Rect(0, BOARD_TOP - int(3 * SCALE), WIDTH, BOARD_HEIGHT + int(6 * SCALE))
     pygame.draw.rect(screen, BORDER_COLOR, border_rect, BORDER_WIDTH, border_radius=CORNER_RADIUS * 2)
 
     draw_info(score, playtime, moves, board)
 
 def draw_info(score, playtime, moves, board):
+    # The info area is drawn just below the image, starting at y = IMAGE_HEIGHT.
     score_text = FONT.render(f"麦芽糖得分: {score}", True, TEXT_COLOR)
-    screen.blit(score_text, (10, 5))
+    screen.blit(score_text, (int(10 * SCALE), IMAGE_HEIGHT + int(5 * SCALE)))
 
     time_text = FONT.render(f"时间: {int(playtime)}秒", True, TEXT_COLOR)
-    screen.blit(time_text, (10, 35))
+    screen.blit(time_text, (int(10 * SCALE), IMAGE_HEIGHT + int(35 * SCALE)))
 
     moves_text = FONT.render(f"动作数: {moves}", True, TEXT_COLOR)
-    moves_text_rect = moves_text.get_rect(topright=(WIDTH - 10, 5))
+    moves_text_rect = moves_text.get_rect(topright=(WIDTH - int(10 * SCALE), IMAGE_HEIGHT + int(5 * SCALE)))
     screen.blit(moves_text, moves_text_rect)
 
     unlocked_chars = set()
@@ -303,21 +345,22 @@ def draw_info(score, playtime, moves, board):
                 unlocked_chars.add(NUM_TO_TEXT[tile_val])
 
     milestone_str = "".join(MILESTONE_ORDER)
-    base_x = 10
-    base_y = 65
+    base_x = int(10 * SCALE)
+    base_y = IMAGE_HEIGHT + int(65 * SCALE)  # info area offset
     cur_x = base_x
 
     for ch in milestone_str:
         color = MILESTONE_UNLOCKED_COLOR if ch in unlocked_chars else MILESTONE_LOCKED_COLOR
         ch_surface = FONT.render(ch, True, color)
         screen.blit(ch_surface, (cur_x, base_y))
-        cur_x += ch_surface.get_width() + 2
+        cur_x += ch_surface.get_width() + int(2 * SCALE)
 
     draw_restart_button()
 
 def draw_restart_button(mouse_down=False):
-    x = WIDTH - RESTART_BUTTON_WIDTH - 10
-    y = 65
+    # Restart button is drawn in the info area.
+    x = WIDTH - RESTART_BUTTON_WIDTH - int(10 * SCALE)
+    y = IMAGE_HEIGHT + int(65 * SCALE)
     button_rect = pygame.Rect(x, y, RESTART_BUTTON_WIDTH, RESTART_BUTTON_HEIGHT)
 
     mx, my = pygame.mouse.get_pos()
@@ -331,7 +374,7 @@ def draw_restart_button(mouse_down=False):
 
     pygame.draw.rect(screen, color, button_rect, border_radius=CORNER_RADIUS)
 
-    btn_font = pygame.font.SysFont("Microsoft YaHei", 18)
+    btn_font = pygame.font.SysFont("Microsoft YaHei", int(18 * SCALE))
     text_surface = btn_font.render(RESTART_BUTTON_TEXT, True, (255, 255, 255))
     text_rect = text_surface.get_rect(center=button_rect.center)
     screen.blit(text_surface, text_rect)
@@ -410,7 +453,7 @@ def process_row_left(row, row_index, current_time):
             new_row.append(new_val)
             row_score += new_val
             merge_anims.append({'pos': (row_index, dest_index), 'value': new_val, 'start_time': current_time})
-            # Animate movement for both tiles if they are not already at dest_index.
+            merge_sound.play()
             if filtered[i][1] != dest_index:
                 move_anims.append({'from': (row_index, filtered[i][1]), 'to': (row_index, dest_index), 'value': filtered[i][0], 'start_time': current_time, 'duration': 0.07})
             if filtered[i+1][1] != dest_index:
@@ -427,7 +470,6 @@ def process_row_left(row, row_index, current_time):
                 changed = True
             i += 1
             dest_index += 1
-    # Pad with zeros
     while len(new_row) < GRID_SIZE:
         new_row.append(0)
     if new_row != row:
@@ -460,7 +502,7 @@ def move_left(board):
     moved = False
     total_score = 0
     merges_global = []
-    moves_global = []  # movement animations
+    moves_global = []
     current_time = time.time()
     for r in range(GRID_SIZE):
         original_row = board[r]
@@ -491,14 +533,11 @@ def move_right(board):
     return moved, total_score, merges_global, moves_global
 
 def move_up(board):
-    # Transpose the board
     board_t = [list(row) for row in zip(*board)]
     moved, score, merge_anims, move_anims = move_left(board_t)
-    # Transpose back
     new_board = [list(row) for row in zip(*board_t)]
     for r in range(GRID_SIZE):
         board[r] = new_board[r]
-    # Adjust animations (swap row and col)
     merge_anims_adjusted = []
     for anim in merge_anims:
         r_t, c_t = anim['pos']
@@ -511,13 +550,11 @@ def move_up(board):
     return moved, score, merge_anims_adjusted, move_anims_adjusted
 
 def move_down(board):
-    # Use move_right on the transposed board to simulate downward movement
     board_t = [list(row) for row in zip(*board)]
     moved, score, merge_anims, move_anims = move_right(board_t)
     new_board = [list(row) for row in zip(*board_t)]
     for r in range(GRID_SIZE):
         board[r] = new_board[r]
-    # Adjust animations (swap row and col)
     merge_anims_adjusted = []
     for anim in merge_anims:
         r_t, c_t = anim['pos']
@@ -557,7 +594,7 @@ def fade_out_animation(old_board, new_board, duration=1.5):
         for col in range(GRID_SIZE):
             value = old_board[row][col]
             x = col * CELL_SIZE
-            y = INFO_HEIGHT + row * CELL_SIZE
+            y = BOARD_TOP + row * CELL_SIZE
             pygame.draw.rect(old_surface, CELL_COLOR, (x, y, CELL_SIZE, CELL_SIZE))
             if value:
                 tile_surface = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
@@ -614,24 +651,22 @@ def main():
     input_buffer = ""
     mouse_down_on_button = False
 
-    # Create a clock for frame rate limiting
     clock = pygame.time.Clock()
 
     while True:
         screen.fill(BACKGROUND_COLOR)
+        # Draw the top image.
+        draw_top_image()
         current_session_time = time.time() - start_time
         playtime = accumulated_time + current_session_time
         current_time = time.time()
         draw_board(board, score, playtime, moves, new_tiles, merge_animations, movement_animations, current_time)
         pygame.display.update()
 
-        # Limit frame rate to 60 FPS
         clock.tick(60)
         
-        # Remove expired new tile and merge animations
         new_tiles = [tile for tile in new_tiles if current_time - tile['start_time'] < 0.3]
         merge_animations = [merge for merge in merge_animations if current_time - merge['start_time'] < 0.3]
-        # Remove movement animations that have completed
         movement_animations = [move for move in movement_animations if current_time - move['start_time'] < move['duration']]
 
         for event in pygame.event.get():
@@ -641,18 +676,24 @@ def main():
                 pygame.quit()
                 sys.exit()
 
+            # If the image (top IMAGE_HEIGHT pixels) is clicked...
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if event.pos[1] < IMAGE_HEIGHT:
+                    show_temp_message("全然わからない~姐姐我断奶~", 1.5)
+                    continue
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    x = WIDTH - RESTART_BUTTON_WIDTH - 10
-                    y = 65
+                    x = WIDTH - RESTART_BUTTON_WIDTH - int(10 * SCALE)
+                    y = IMAGE_HEIGHT + int(65 * SCALE)
                     button_rect = pygame.Rect(x, y, RESTART_BUTTON_WIDTH, RESTART_BUTTON_HEIGHT)
                     if button_rect.collidepoint(event.pos):
                         mouse_down_on_button = True
 
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
-                    x = WIDTH - RESTART_BUTTON_WIDTH - 10
-                    y = 65
+                    x = WIDTH - RESTART_BUTTON_WIDTH - int(10 * SCALE)
+                    y = IMAGE_HEIGHT + int(65 * SCALE)
                     button_rect = pygame.Rect(x, y, RESTART_BUTTON_WIDTH, RESTART_BUTTON_HEIGHT)
                     if button_rect.collidepoint(event.pos) and mouse_down_on_button:
                         if confirm_action("宝宝要重新开始吗 (yes/no)"):
@@ -707,9 +748,7 @@ def main():
                 if moved:
                     score += move_score
                     moves += 1
-                    # Add merge animations
                     merge_animations.extend(merges_info)
-                    # Add movement animations for sliding tiles
                     movement_animations.extend(move_anims)
 
                     new_tile = add_new_tile(board)
