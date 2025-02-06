@@ -233,7 +233,9 @@ def draw_top_image():
     # Draw the top image at (0,0)
     screen.blit(top_image, (0, 0))
 
-def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movement_animations, current_time):
+def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movement_animations, current_time, swap_selection=None):
+    if swap_selection is None:
+        swap_selection = []
     # Determine destination cells that are currently animated (movement in progress)
     animated_destinations = {tuple(anim['to']) for anim in movement_animations if current_time - anim['start_time'] < anim['duration']}
     
@@ -244,6 +246,11 @@ def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movem
             y = BOARD_TOP + row * CELL_SIZE  # board starts at BOARD_TOP (IMAGE_HEIGHT + INFO_HEIGHT)
             cell_rect = pygame.Rect(x + GRID_GAP//2, y + GRID_GAP//2, CELL_SIZE - GRID_GAP, CELL_SIZE - GRID_GAP)
             pygame.draw.rect(screen, CELL_COLOR, cell_rect, border_radius=CORNER_RADIUS)
+            
+            # If this cell is selected for swapping, draw a red highlight.
+            if (row, col) in swap_selection:
+                pygame.draw.rect(screen, (255, 0, 0), cell_rect, width=3, border_radius=CORNER_RADIUS)
+            
             if board[row][col]:
                 if (row, col) in animated_destinations:
                     continue  # This tile is being animated via movement animation
@@ -651,6 +658,9 @@ def main():
     input_buffer = ""
     mouse_down_on_button = False
 
+    # Variable to hold the board cell selected for swapping.
+    swap_selection = []
+
     clock = pygame.time.Clock()
 
     while True:
@@ -660,7 +670,7 @@ def main():
         current_session_time = time.time() - start_time
         playtime = accumulated_time + current_session_time
         current_time = time.time()
-        draw_board(board, score, playtime, moves, new_tiles, merge_animations, movement_animations, current_time)
+        draw_board(board, score, playtime, moves, new_tiles, merge_animations, movement_animations, current_time, swap_selection)
         pygame.display.update()
 
         clock.tick(60)
@@ -684,11 +694,37 @@ def main():
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
+                    # Check if restart button is pressed.
                     x = WIDTH - RESTART_BUTTON_WIDTH - int(10 * SCALE)
                     y = IMAGE_HEIGHT + int(65 * SCALE)
                     button_rect = pygame.Rect(x, y, RESTART_BUTTON_WIDTH, RESTART_BUTTON_HEIGHT)
                     if button_rect.collidepoint(event.pos):
                         mouse_down_on_button = True
+                    # Check if the board cell was clicked (for swapping)
+                    elif BOARD_TOP <= event.pos[1] < BOARD_TOP + BOARD_HEIGHT:
+                        col = event.pos[0] // CELL_SIZE
+                        row = (event.pos[1] - BOARD_TOP) // CELL_SIZE
+                        if len(swap_selection) == 0:
+                            swap_selection.append((row, col))
+                        elif len(swap_selection) == 1:
+                            # If the same cell is clicked again, cancel selection.
+                            if swap_selection[0] == (row, col):
+                                swap_selection = []
+                            else:
+                                swap_selection.append((row, col))
+                                # Swap the contents of the two selected cells.
+                                r1, c1 = swap_selection[0]
+                                r2, c2 = swap_selection[1]
+                                board[r1][c1], board[r2][c2] = board[r2][c2], board[r1][c1]
+                                moves += 1
+                                history.append(copy_board(board))
+                                if len(history) > MAX_HISTORY_SIZE:
+                                    history.pop(0)
+                                show_temp_message("交换成功~", 1.0)
+                                swap_selection = []
+                                accumulated_time += (time.time() - start_time)
+                                start_time = time.time()
+                                save_game(board, history, score, moves, accumulated_time)
 
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
@@ -702,7 +738,7 @@ def main():
                             merge_animations = new_merge_animations
                             movement_animations = new_move_anims
                             save_game(board, history, score, moves, accumulated_time)
-                    mouse_down_on_button = False
+                        mouse_down_on_button = False
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
