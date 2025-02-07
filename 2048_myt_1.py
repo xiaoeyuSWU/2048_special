@@ -333,12 +333,22 @@ def draw_board(board, score, playtime, moves, new_tiles, merge_animations, movem
     draw_info(score, playtime, moves, board)
 
 def draw_info(score, playtime, moves, board):
+    # Convert playtime to minutes and seconds
+    hours = int(playtime // 3600)  # Calculate total hours
+    minutes = int((playtime % 3600) // 60)  # Calculate remaining minutes after hours
+    seconds = int(playtime % 60)  # Calculate remaining seconds after minutes
+
+    if hours > 0:
+        time_text = f"宝宝已经玩了: {hours}小时{minutes}分{seconds}秒"
+    else:
+        time_text = f"宝宝已经玩了: {minutes}分{seconds}秒"
+
     # The info area is drawn just below the image, starting at y = IMAGE_HEIGHT.
     score_text = FONT.render(f"麦芽糖得分: {score}", True, TEXT_COLOR)
     screen.blit(score_text, (int(10 * SCALE), IMAGE_HEIGHT + int(5 * SCALE)))
 
-    time_text = FONT.render(f"时间: {int(playtime)}秒", True, TEXT_COLOR)
-    screen.blit(time_text, (int(10 * SCALE), IMAGE_HEIGHT + int(35 * SCALE)))
+    time_text_rendered = FONT.render(time_text, True, TEXT_COLOR)
+    screen.blit(time_text_rendered, (int(10 * SCALE), IMAGE_HEIGHT + int(35 * SCALE)))
 
     moves_text = FONT.render(f"动作数: {moves}", True, TEXT_COLOR)
     moves_text_rect = moves_text.get_rect(topright=(WIDTH - int(10 * SCALE), IMAGE_HEIGHT + int(5 * SCALE)))
@@ -363,6 +373,8 @@ def draw_info(score, playtime, moves, board):
         cur_x += ch_surface.get_width() + int(2 * SCALE)
 
     draw_restart_button()
+
+
 
 def draw_restart_button(mouse_down=False):
     # Restart button is drawn in the info area.
@@ -720,7 +732,7 @@ def main():
                                 history.append(copy_board(board))
                                 if len(history) > MAX_HISTORY_SIZE:
                                     history.pop(0)
-                                show_temp_message("交换成功~", 1.0)
+                                show_temp_message("交换成功~麦芽糖就是喜欢小鳄鱼呀^ ^", 1.5)
                                 swap_selection = []
                                 accumulated_time += (time.time() - start_time)
                                 start_time = time.time()
